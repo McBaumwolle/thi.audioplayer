@@ -7,6 +7,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Tooltip;
 import javafx.stage.Stage;
 import studiplayer.audio.PlayList;
 import studiplayer.audio.AudioFile;
@@ -27,6 +29,8 @@ public class Player extends Application {
 	private String playT = "--:--";							//playTime
 	private volatile boolean stopped;						//playing status 
 	private boolean editorVisible;							//state of PlayListEditor
+	private float barStatus = 0;							//for the statusbar
+	private boolean isDark = false;							//dark theme status
 	
 	//attribute playListPathname
 	private String playListPathname = "";
@@ -37,12 +41,18 @@ public class Player extends Application {
 	Button stopButton = createButton("stop.png");
 	Button nextButton = createButton("next.png");
 	Button editorButton = createButton("pl_editor.png");
+	Button ThemeButton = createButton("random.png");
+
+	//bars
+	ProgressBar progressBar = new ProgressBar(barStatus);
 
     //fields
 	BorderPane mainPane = new BorderPane();			//main window apparently
 	private Label songDescription = new Label(songDesc);	//label for main text	//songLabel
 	private Label playTime = new Label(playT);		//label for time
 	HBox buttonlableHBox = new HBox();				//box for buttons and playTime
+
+	HBox statuslableHBox = new HBox();				//box for statusbar (and?)
 	
 	//other
 	private PlayList playList;						//playlist 
@@ -51,7 +61,7 @@ public class Player extends Application {
 	//public static final String DEFAULT_PLAYLIST = "C:/Users/matth/OneDrive/Desktop/project5/playlists/DefaultPlayList";
 	//public static final String DEFAULT_PLAYLIST = "playlists/DefaultPlayList.m3u";		//for APA
 	private static final String startPos = "00:00";
-	private static final String currentSong = "current song: ";
+	private static final String currentSong = " "; 	//"current song: ";
 	private PlayListEditor playListEditor;			//for the Editor
 
 
@@ -73,7 +83,7 @@ public class Player extends Application {
 				songDescription.setText(songDesc + " CL");
 				playTime.setText(startPos);
 				this.primaryStage = primaryStage;
-				this.primaryStage.setTitle(currentSong + songDescription.getText());
+				this.primaryStage.setTitle(currentSong + playList.getCurrentAudioFile().getTitle());
 			} catch (Exception e) {
 				//no playlist found
 				System.out.println("no playlist found from given path");
@@ -91,7 +101,7 @@ public class Player extends Application {
 				songDescription.setText(songDesc);
 				playTime.setText(startPos);
 				this.primaryStage = primaryStage;
-				this.primaryStage.setTitle(currentSong + songDescription.getText());
+				this.primaryStage.setTitle(currentSong + playList.getCurrentAudioFile().getTitle());
 			} catch (Exception e) {
 				//no playlist found
 				playListPathname = DEFAULT_PLAYLIST;
@@ -116,6 +126,15 @@ public class Player extends Application {
 		BorderPane.setMargin(buttonlableHBox, new Insets(5, 5, 5, 5));
 		HBox.setMargin(playTime, new Insets(20, 10, 10, 5));
 
+
+		//set statuslableHBox above buttonlableHBox
+		statuslableHBox.getChildren().addAll(progressBar);
+		mainPane.setCenter(statuslableHBox);
+		BorderPane.setMargin(statuslableHBox, new Insets(5, 5, 0, 49));
+
+		//set progressBar width to 200
+		progressBar.setPrefWidth(319);
+
 		//set initial button state
 		setButtonstates(true, false, true, false, true);
 
@@ -123,8 +142,19 @@ public class Player extends Application {
 		editorVisible = false;
 		playListEditor = new PlayListEditor(this, this.playList);
 
+		//add tooltips to buttons
+		playButton.setTooltip(new Tooltip("play song"));
+		pauseButton.setTooltip(new Tooltip("pause current song"));
+		stopButton.setTooltip(new Tooltip("stop playback"));
+		nextButton.setTooltip(new Tooltip("next song"));
+		editorButton.setTooltip(new Tooltip("open playlist editor\nin a new window"));
+		
+		//theme	setting
+		setTheme(isDark);
+
+
 		//create and show scene aka window
-		Scene scene = new Scene(mainPane, 700, 90);		//700, 90
+		Scene scene = new Scene(mainPane, 375, 110);		//700, 90
 		primaryStage.setScene(scene);
 		primaryStage.show();
 
@@ -139,6 +169,7 @@ public class Player extends Application {
 
 		stopButton.setOnAction(e -> {
 			stopCurrentSong();
+			//stopButton.setVisible(false);			
 		});
 
 		nextButton.setOnAction(e -> {
@@ -152,6 +183,16 @@ public class Player extends Application {
 			} else {
 				editorVisible = true;
 				playListEditor.show();
+			}
+		});
+
+		songDescription.setOnMouseClicked(e -> {
+			if (isDark) {
+				isDark = false;
+				setTheme(isDark);
+			} else {
+				isDark = true;
+				setTheme(isDark);
 			}
 		});
 
@@ -252,10 +293,13 @@ public class Player extends Application {
 			this.primaryStage.setTitle("no current song");
 			playTime.setText("--:--");
 		} else {
-			songDesc = af.toString();
+			songDesc = af.toString() + " - " + playList.getCurrent();		//TODO clean
 			songDescription.setText(songDesc);
 			playTime.setText(startPos);
-			this.primaryStage.setTitle(currentSong + songDescription.getText());
+			this.primaryStage.setTitle(currentSong + playList.getCurrentAudioFile().getTitle());
+			
+			
+			progressBar.setProgress(barStatus);
 		}
 	}
 
@@ -284,6 +328,8 @@ public class Player extends Application {
 			if (playList != null && playList.size() > 0) {
 				updateSongInfo(playList.getCurrentAudioFile());
 				playTime.setText(playT);
+
+				progressBar.setProgress(barStatus);
 				//setButtonstates(false, true, false, true, false);
 			} else {
 				updateSongInfo(null);
@@ -299,10 +345,14 @@ public class Player extends Application {
 			while (!stopped && !playList.isEmpty()) {
 				//update label for time
 				playT = playList.getCurrentAudioFile().getFormattedPosition();
+				//refreshUI();
+
+				//new things here
+				barStatus = ((float) playList.getCurrentAudioFile().getPosition() / (float) playList.getCurrentAudioFile().getDuration());
 				refreshUI();
-				
+
 				try {
-					Thread.sleep(100);
+					Thread.sleep(500);
 				} catch (InterruptedException e) {
 					//e.printStackTrace();
 				}
@@ -336,6 +386,49 @@ public class Player extends Application {
 	//getter for playListPathname
 	public String getPlayListPathname() {
 		return playListPathname;
+	}
+
+	//method for setting theme
+	public void setTheme(boolean dark) {
+		if (dark) {
+			//set dark theme
+			//set dark theme for buttons
+			playButton.setStyle("-fx-base: #575757;");
+			pauseButton.setStyle("-fx-base: #575757;");
+			stopButton.setStyle("-fx-base: #575757;");
+			nextButton.setStyle("-fx-base: #575757;");
+			editorButton.setStyle("-fx-base: #575757;");
+
+			//set windows background color 
+			mainPane.setStyle("-fx-background-color: #424242;");
+
+			//set text color to white
+			songDescription.setStyle("-fx-text-fill: #f0f0f0;");
+			playTime.setStyle("-fx-text-fill: #f0f0f0;");
+			progressBar.setStyle("-fx-accent: #82c482;");
+
+			//set progress bar color to #998550
+			progressBar.setStyle("-fx-accent: #998550;");
+
+		} else {
+			//set light theme
+			//reset colors for buttons
+			playButton.setStyle("-fx-base: #f0f0f0;");
+			pauseButton.setStyle("-fx-base: #f0f0f0;");
+			stopButton.setStyle("-fx-base: #f0f0f0;");
+			nextButton.setStyle("-fx-base: #f0f0f0;");
+			editorButton.setStyle("-fx-base: #f0f0f0;");
+
+			//reset windows background color
+			mainPane.setStyle("-fx-background-color: #f0f0f0;");
+
+			//reset text color to black
+			songDescription.setStyle("-fx-text-fill: #000000;");
+			playTime.setStyle("-fx-text-fill: #000000;");
+
+			//set progress bar color to #967d38
+			progressBar.setStyle("-fx-accent: #967d38;");
+		}
 	}
 	
 
